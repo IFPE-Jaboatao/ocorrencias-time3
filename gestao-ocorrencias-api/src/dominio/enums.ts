@@ -1,0 +1,21 @@
+export enum PerfilUsuario {
+  PROFESSOR = 'PROFESSOR',
+  COORDENADOR = 'COORDENADOR',
+  EQUIPE_PEDAGOGICA = 'EQUIPE_PEDAGOGICA',
+  ALUNO = 'ALUNO',
+  RESPONSAVEL = 'RESPONSAVEL',
+  ADMIN = 'ADMIN',
+}
+
+export enum SeveridadeOcorrencia {
+  BAIXA = 'BAIXA',
+  MEDIA = 'MEDIA',
+  ALTA = 'ALTA',
+}
+
+export enum StatusOcorrencia {
+  ABERTA = 'ABERTA',
+  EM_ACOMPANHAMENTO = 'EM_ACOMPANHAMENTO',
+  RESOLVIDA = 'RESOLVIDA',
+  ARQUIVADA = 'ARQUIVADA',
+}
