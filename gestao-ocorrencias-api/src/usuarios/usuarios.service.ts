@@ -32,4 +32,8 @@ export class UsuariosService {
   async findAll(): Promise<Usuario[]> {
     return await this.usuarioRepository.find();
   }
+  // Adicione dentro de UsuariosService:
+  async findByEmail(email: string): Promise<Usuario | null> {
+    return await this.usuarioRepository.findOne({ where: { email } });
+  }
 }

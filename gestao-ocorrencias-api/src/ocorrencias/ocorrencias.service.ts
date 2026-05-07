@@ -76,4 +76,5 @@ export class OcorrenciasService {
 
     return await this.ocorrenciaRepository.save(ocorrencia);
   }
+
 }

@@ -5,6 +5,7 @@ import { Usuario } from './usuarios/entities/usuario.entity';
 import { Ocorrencia } from './ocorrencias/entities/ocorrencia.entity';
 import { UsuariosModule } from './usuarios/usuarios.module';
 import { OcorrenciasModule } from './ocorrencias/ocorrencias.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { OcorrenciasModule } from './ocorrencias/ocorrencias.module';
       database: 'gestao_ocorrencias',
       entities: [Usuario, Ocorrencia],
       synchronize: true, // Cria as tabelas automaticamente (use apenas em ambiente de desenvolvimento)
-    }), UsuariosModule, OcorrenciasModule,
+    }), UsuariosModule, OcorrenciasModule, AuthModule,
   ],
   controllers: [],
   providers: [],
