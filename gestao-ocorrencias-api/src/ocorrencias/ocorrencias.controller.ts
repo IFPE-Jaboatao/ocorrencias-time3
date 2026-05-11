@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Patch, Param, UseGuards } from '@nestjs/common'; // <-- Importe UseGuards
+import { Controller, Post, Body, Patch, Param, UseGuards, Get, Req } from '@nestjs/common'; // <-- Importe UseGuards
 import { RolesGuard } from '../dominio/auth/roles.guard'; // <-- Importe o Guard
 import { Perfis } from '../dominio/auth/perfis.decorator'; // <-- Importe o Decorator
 import { PerfilUsuario } from '../dominio/enums'; // <-- Importe o Enum
@@ -12,6 +12,25 @@ import { ApiOperation, ApiTags, ApiResponse, ApiParam } from '@nestjs/swagger';
 @UseGuards(RolesGuard) // <-- Aplica o Guardião em todas as rotas deste Controller
 export class OcorrenciasController {
   constructor(private readonly ocorrenciasService: OcorrenciasService) {}
+
+@Get()
+  @ApiOperation({ summary: 'Lista ocorrências (Com filtro inteligente de perfil)' })
+  @ApiResponse({ status: 200, description: 'Lista retornada com sucesso.' })
+  // Permitimos que qualquer usuário logado acesse a rota, pois o filtro ocorre lá dentro do Service
+  @Perfis(PerfilUsuario.ALUNO, PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN, PerfilUsuario.EQUIPE_PEDAGOGICA)
+  findAll(@Req() request: any) {
+    const usuarioLogado = request.user; // Pega os dados decodificados do Token JWT
+    return this.ocorrenciasService.findAll(usuarioLogado);
+  }
+// NOVA ROTA DO DASHBOARD (Coloque ANTES do @Patch(':id/status'))
+  @Get('dashboard')
+  @ApiOperation({ summary: 'Retorna estatísticas gerenciais para o Dashboard' })
+  @ApiResponse({ status: 200, description: 'Indicadores retornados com sucesso.' })
+  // Regra de Negócio: Apenas o escalão superior pode ver o balanço geral
+  @Perfis(PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
+  getDashboard() {
+    return this.ocorrenciasService.getDashboardEstatisticas();
+  }
 
 @Post()
   // Pela regra de negócio, apenas Professor, Coordenador e Admin podem registrar!

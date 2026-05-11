@@ -7,7 +7,7 @@ import { Repository } from 'typeorm';
 import { Ocorrencia } from './entities/ocorrencia.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
-import { StatusOcorrencia, SeveridadeOcorrencia } from '../dominio/enums';
+import { StatusOcorrencia, SeveridadeOcorrencia, PerfilUsuario } from '../dominio/enums';
 
 @Injectable()
 export class OcorrenciasService {
@@ -77,4 +77,59 @@ export class OcorrenciasService {
     return await this.ocorrenciaRepository.save(ocorrencia);
   }
 
+// Adicione dentro de OcorrenciasService:
+
+  async getDashboardEstatisticas() {
+    const queryBuilder = this.ocorrenciaRepository.createQueryBuilder('ocorrencia');
+
+    // 1. Contagem por Status (Quantas Abertas, Resolvidas, etc)
+    const porStatus = await queryBuilder
+      .select('ocorrencia.status', 'status')
+      .addSelect('COUNT(ocorrencia.id)', 'quantidade')
+      .groupBy('ocorrencia.status')
+      .getRawMany();
+
+    // 2. Contagem por Severidade (Quantas Altas, Médias, Baixas)
+    const porSeveridade = await this.ocorrenciaRepository.createQueryBuilder('ocorrencia')
+      .select('ocorrencia.severidade', 'severidade')
+      .addSelect('COUNT(ocorrencia.id)', 'quantidade')
+      .groupBy('ocorrencia.severidade')
+      .getRawMany();
+
+    // 3. Contagem Total de Ocorrências no Sistema
+    const total = await this.ocorrenciaRepository.count();
+
+    return {
+      total,
+      indicadores: {
+        porStatus,
+        porSeveridade
+      }
+    };
+  }
+
+
+
+async findAll(usuarioLogado: any): Promise<Ocorrencia[]> {
+    // 1. Se for ALUNO, filtra para trazer apenas as ocorrências onde ele é o "aluno"
+    if (usuarioLogado.perfil === PerfilUsuario.ALUNO) { // CORRIGIDO AQUI
+      return await this.ocorrenciaRepository.find({
+        where: { aluno: { id: usuarioLogado.sub } }, 
+        relations: ['aluno', 'autor'], 
+      });
+    }
+
+    // 2. Se for PROFESSOR, traz apenas as que ele mesmo registrou
+    if (usuarioLogado.perfil === PerfilUsuario.PROFESSOR) { // AJUSTADO AQUI PARA USAR O ENUM
+      return await this.ocorrenciaRepository.find({
+        where: { autor: { id: usuarioLogado.sub } },
+        relations: ['aluno', 'autor'],
+      });
+    }
+
+    // 3. Se for COORDENADOR, ADMIN ou EQUIPE PEDAGÓGICA, traz todas as ocorrências do sistema
+    return await this.ocorrenciaRepository.find({
+      relations: ['aluno', 'autor'],
+    });
+  }
 }
