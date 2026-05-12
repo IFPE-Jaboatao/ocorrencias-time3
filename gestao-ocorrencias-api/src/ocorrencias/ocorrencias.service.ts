@@ -8,14 +8,16 @@ import { Ocorrencia } from './entities/ocorrencia.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
 import { StatusOcorrencia, SeveridadeOcorrencia, PerfilUsuario } from '../dominio/enums';
+import { AuditoriaService } from '../auditoria/auditoria.service';
 
 @Injectable()
 export class OcorrenciasService {
-  constructor(
+constructor(
     @InjectRepository(Ocorrencia)
     private ocorrenciaRepository: Repository<Ocorrencia>,
     @InjectRepository(Usuario)
     private usuarioRepository: Repository<Usuario>,
+    private auditoriaService: AuditoriaService, // <-- ADICIONE AQUI
   ) {}
 
   async create(dto: CreateOcorrenciaDto): Promise<Ocorrencia> {
@@ -53,28 +55,46 @@ export class OcorrenciasService {
 
     return ocorrenciaSalva;
   }
-  async updateStatus(id: string, dto: UpdateStatusDto): Promise<Ocorrencia> {
+async updateStatus(id: string, dto: UpdateStatusDto, usuarioLogado: any): Promise<Ocorrencia> {
+    // 1. Busca a ocorrência atual no banco
     const ocorrencia = await this.ocorrenciaRepository.findOne({ where: { id } });
     
     if (!ocorrencia) {
       throw new NotFoundException('Ocorrência não encontrada.');
     }
 
-    // REGRA DE NEGÓCIO: Alterações em ocorrência resolvida exigem justificativa
+    // 2. Regra de Negócio: Justificativa obrigatória
     if (ocorrencia.status === StatusOcorrencia.RESOLVIDA && !dto.justificativa) {
       throw new BadRequestException(
         'Como esta ocorrência já foi resolvida, é obrigatório enviar uma justificativa para alterá-la novamente.'
       );
     }
 
-    // Atualiza os dados
+    // 3. CAPTURA O STATUS ANTIGO (Exatamente aqui, antes de mudar!)
+    const statusAntigo = ocorrencia.status;
+
+    // 4. Atualiza os dados na memória
     ocorrencia.status = dto.status;
-    
     if (dto.justificativa) {
       ocorrencia.justificativa = dto.justificativa;
     }
 
-    return await this.ocorrenciaRepository.save(ocorrencia);
+    // 5. Salva no banco de dados
+    const ocorrenciaSalva = await this.ocorrenciaRepository.save(ocorrencia);
+
+    // 6. Registra na Auditoria usando o statusAntigo que guardamos lá no passo 3
+    this.auditoriaService.registrarLog(
+      usuarioLogado.sub, 
+      'ATUALIZACAO_STATUS', 
+      { 
+        ocorrenciaId: id, 
+        de: statusAntigo, 
+        para: dto.status, 
+        justificativa: dto.justificativa 
+      }
+    );
+
+    return ocorrenciaSalva;
   }
 
 // Adicione dentro de OcorrenciasService:

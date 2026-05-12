@@ -46,10 +46,11 @@ export class OcorrenciasController {
   @ApiParam({ name: 'id', description: 'ID (UUID) da ocorrência' })
   @ApiResponse({ status: 200, description: 'Status atualizado com sucesso.' })
   @ApiResponse({ status: 400, description: 'Bad Request - Faltando justificativa para ocorrência resolvida.' })
-  updateStatus(
+updateStatus(
     @Param('id') id: string, 
-    @Body() updateStatusDto: UpdateStatusDto
+    @Body() updateStatusDto: UpdateStatusDto,
+    @Req() request: any // <-- Adicione isso
   ) {
-    return this.ocorrenciasService.updateStatus(id, updateStatusDto);
+    return this.ocorrenciasService.updateStatus(id, updateStatusDto, request.user); // <-- Passe o request.user
   }
 }
