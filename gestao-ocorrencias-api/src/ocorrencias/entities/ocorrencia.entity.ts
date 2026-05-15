@@ -1,6 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { Usuario } from '../../usuarios/entities/usuario.entity';
 import { SeveridadeOcorrencia, StatusOcorrencia } from '../../dominio/enums';
+import { Evidencia } from './evidencia.entity'; // <-- NOVA IMPORTAÇÃO
 
 @Entity('ocorrencias')
 export class Ocorrencia {
@@ -38,4 +39,7 @@ export class Ocorrencia {
 
   @UpdateDateColumn()
   dataAtualizacao!: Date;
+
+  @OneToMany(() => Evidencia, (evidencia) => evidencia.ocorrencia)
+  evidencias!: Evidencia[];
 }

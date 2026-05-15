@@ -5,12 +5,13 @@ import { OcorrenciasController } from './ocorrencias.controller';
 import { Ocorrencia } from './entities/ocorrencia.entity';
 import { Usuario } from '../usuarios/entities/usuario.entity';
 import { AuditoriaModule } from '../auditoria/auditoria.module';
+import { Evidencia } from './entities/evidencia.entity'; // <-- NOVA IMPORTAÇÃO
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Ocorrencia, Usuario]),
-    AuditoriaModule, // A vírgula aqui separa os módulos importados
-  ], // <-- A vírgula aqui (que provavelmente estava faltando) separa o array de imports dos controllers
+    TypeOrmModule.forFeature([Ocorrencia, Usuario, Evidencia]), // <-- EVIDÊNCIA ADICIONADA AQUI
+    AuditoriaModule,
+  ],
   controllers: [OcorrenciasController],
   providers: [OcorrenciasService],
 })

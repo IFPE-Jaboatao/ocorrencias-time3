@@ -18,6 +18,9 @@ export class Usuario {
   @Column({ type: 'enum', enum: PerfilUsuario })
   perfil!: PerfilUsuario;
 
+  @Column({ nullable: true })
+  fotoPerfil!: string; // Guardará o nome do ficheiro (ex: profile-123.jpg)
+
   @CreateDateColumn()
   dataCriacao!: Date;
 }

@@ -9,6 +9,7 @@ import { Usuario } from '../usuarios/entities/usuario.entity';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
 import { StatusOcorrencia, SeveridadeOcorrencia, PerfilUsuario } from '../dominio/enums';
 import { AuditoriaService } from '../auditoria/auditoria.service';
+import { Evidencia } from './entities/evidencia.entity';
 
 @Injectable()
 export class OcorrenciasService {
@@ -17,7 +18,9 @@ constructor(
     private ocorrenciaRepository: Repository<Ocorrencia>,
     @InjectRepository(Usuario)
     private usuarioRepository: Repository<Usuario>,
-    private auditoriaService: AuditoriaService, // <-- ADICIONE AQUI
+    @InjectRepository(Evidencia) // <-- ADICIONE AQUI
+    private evidenciaRepository: Repository<Evidencia>, // <-- ADICIONE AQUI
+    private auditoriaService: AuditoriaService,
   ) {}
 
   async create(dto: CreateOcorrenciaDto): Promise<Ocorrencia> {
@@ -151,5 +154,22 @@ async findAll(usuarioLogado: any): Promise<Ocorrencia[]> {
     return await this.ocorrenciaRepository.find({
       relations: ['aluno', 'autor'],
     });
+  }
+  async anexarEvidencia(ocorrenciaId: string, arquivo: Express.Multer.File): Promise<Evidencia> {
+    const ocorrencia = await this.ocorrenciaRepository.findOne({ where: { id: ocorrenciaId } });
+    
+    if (!ocorrencia) {
+      throw new NotFoundException('Ocorrência não encontrada.');
+    }
+
+    // Cria o registro da evidência associando à ocorrência
+    const novaEvidencia = this.evidenciaRepository.create({
+      nomeOriginal: arquivo.originalname,
+      caminhoArquivo: arquivo.path, // O caminho onde o Multer salvou o arquivo
+      tipoMime: arquivo.mimetype,
+      ocorrencia: ocorrencia,
+    });
+
+    return await this.evidenciaRepository.save(novaEvidencia);
   }
 }

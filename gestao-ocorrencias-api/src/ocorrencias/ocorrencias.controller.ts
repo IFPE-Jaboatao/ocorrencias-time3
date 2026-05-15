@@ -1,56 +1,78 @@
-import { Controller, Post, Body, Patch, Param, UseGuards, Get, Req } from '@nestjs/common'; // <-- Importe UseGuards
-import { RolesGuard } from '../dominio/auth/roles.guard'; // <-- Importe o Guard
-import { Perfis } from '../dominio/auth/perfis.decorator'; // <-- Importe o Decorator
-import { PerfilUsuario } from '../dominio/enums'; // <-- Importe o Enum
+import { Controller, Get, Post, Body, Patch, Param, UseGuards, Req, UseInterceptors, UploadedFile, ParseFilePipe, MaxFileSizeValidator, FileTypeValidator } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname } from 'path';
 import { OcorrenciasService } from './ocorrencias.service';
 import { CreateOcorrenciaDto } from './dto/create-ocorrencia.dto';
 import { UpdateStatusDto } from './dto/update-status.dto';
-import { ApiOperation, ApiTags, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { RolesGuard } from '../dominio/auth/roles.guard';
+import { Perfis } from '../dominio/auth/perfis.decorator';
+import { PerfilUsuario } from '../dominio/enums';
+import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 
-@ApiTags('Ocorrências')
+@ApiTags('Ocorrencias')
+@ApiBearerAuth()
+@UseGuards(RolesGuard)
 @Controller('ocorrencias')
-@UseGuards(RolesGuard) // <-- Aplica o Guardião em todas as rotas deste Controller
 export class OcorrenciasController {
   constructor(private readonly ocorrenciasService: OcorrenciasService) {}
 
-@Get()
+  @Post()
+  @ApiOperation({ summary: 'Cria uma nova ocorrência' })
+  @Perfis(PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
+  create(@Body() createOcorrenciaDto: CreateOcorrenciaDto) {
+    return this.ocorrenciasService.create(createOcorrenciaDto);
+  }
+
+  @Get()
   @ApiOperation({ summary: 'Lista ocorrências (Com filtro inteligente de perfil)' })
-  @ApiResponse({ status: 200, description: 'Lista retornada com sucesso.' })
-  // Permitimos que qualquer usuário logado acesse a rota, pois o filtro ocorre lá dentro do Service
   @Perfis(PerfilUsuario.ALUNO, PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN, PerfilUsuario.EQUIPE_PEDAGOGICA)
   findAll(@Req() request: any) {
-    const usuarioLogado = request.user; // Pega os dados decodificados do Token JWT
-    return this.ocorrenciasService.findAll(usuarioLogado);
+    return this.ocorrenciasService.findAll(request.user);
   }
-// NOVA ROTA DO DASHBOARD (Coloque ANTES do @Patch(':id/status'))
+
   @Get('dashboard')
   @ApiOperation({ summary: 'Retorna estatísticas gerenciais para o Dashboard' })
-  @ApiResponse({ status: 200, description: 'Indicadores retornados com sucesso.' })
-  // Regra de Negócio: Apenas o escalão superior pode ver o balanço geral
   @Perfis(PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
   getDashboard() {
     return this.ocorrenciasService.getDashboardEstatisticas();
   }
 
-@Post()
-  // Pela regra de negócio, apenas Professor, Coordenador e Admin podem registrar!
-  @Perfis(PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
-  @ApiOperation({ summary: 'Registra uma nova ocorrência (Apenas Prof/Coord/Admin)' })
-  create(@Body() createOcorrenciaDto: CreateOcorrenciaDto) {
-    return this.ocorrenciasService.create(createOcorrenciaDto);
-  }
-
-  // NOVA ROTA ADICIONADA:
   @Patch(':id/status')
   @ApiOperation({ summary: 'Atualiza o status de uma ocorrência' })
-  @ApiParam({ name: 'id', description: 'ID (UUID) da ocorrência' })
-  @ApiResponse({ status: 200, description: 'Status atualizado com sucesso.' })
-  @ApiResponse({ status: 400, description: 'Bad Request - Faltando justificativa para ocorrência resolvida.' })
-updateStatus(
+  @Perfis(PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN, PerfilUsuario.PROFESSOR)
+  updateStatus(
     @Param('id') id: string, 
     @Body() updateStatusDto: UpdateStatusDto,
-    @Req() request: any // <-- Adicione isso
+    @Req() request: any
   ) {
-    return this.ocorrenciasService.updateStatus(id, updateStatusDto, request.user); // <-- Passe o request.user
+    return this.ocorrenciasService.updateStatus(id, updateStatusDto, request.user);
+  }
+
+  @Post(':id/evidencias')
+  @ApiOperation({ summary: 'Anexa uma evidência (imagem ou PDF) à ocorrência' })
+  @Perfis(PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
+  @UseInterceptors(FileInterceptor('arquivo', {
+    storage: diskStorage({
+      destination: './uploads',
+      filename: (req, file, cb) => {
+        const nomeUnico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        const extensao = extname(file.originalname);
+        cb(null, `${nomeUnico}${extensao}`);
+      }
+    })
+  }))
+  uploadEvidencia(
+    @Param('id') id: string,
+    @UploadedFile(
+      new ParseFilePipe({
+        validators: [
+          new MaxFileSizeValidator({ maxSize: 5000000 }),
+          new FileTypeValidator({ fileType: '.(png|jpeg|jpg|pdf)' }),
+        ],
+      }),
+    ) arquivo: Express.Multer.File,
+  ) {
+    return this.ocorrenciasService.anexarEvidencia(id, arquivo);
   }
 }

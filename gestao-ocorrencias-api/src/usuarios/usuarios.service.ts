@@ -1,5 +1,5 @@
 // src/usuarios/usuarios.service.ts
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
@@ -29,9 +29,18 @@ export class UsuariosService {
     return await this.usuarioRepository.save(novoUsuario);
   }
 
+  async atualizarFoto(usuarioId: string, nomeFicheiro: string) {
+    const usuario = await this.usuarioRepository.findOne({ where: { id: usuarioId } });
+    if (!usuario) throw new NotFoundException('Usuário não encontrado');
+
+    usuario.fotoPerfil = nomeFicheiro;
+    return await this.usuarioRepository.save(usuario);
+  }
+
   async findAll(): Promise<Usuario[]> {
     return await this.usuarioRepository.find();
   }
+
   // Adicione dentro de UsuariosService:
   async findByEmail(email: string): Promise<Usuario | null> {
     return await this.usuarioRepository.findOne({ where: { email } });
