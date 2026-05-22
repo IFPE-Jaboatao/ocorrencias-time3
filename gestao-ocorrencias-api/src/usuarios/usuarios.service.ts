@@ -1,9 +1,9 @@
-// src/usuarios/usuarios.service.ts
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
+import * as bcrypt from 'bcrypt'; // <-- 1. Importação do bcrypt adicionada aqui
 
 @Injectable()
 export class UsuariosService {
@@ -25,7 +25,16 @@ export class UsuariosService {
       throw new ConflictException('Já existe um usuário com este email ou matrícula cadastrado.');
     }
 
-    const novoUsuario = this.usuarioRepository.create(createUsuarioDto);
+    // <-- 2. A mágica da criptografia acontece aqui
+    const saltRounds = 10;
+    const senhaCriptografada = await bcrypt.hash(createUsuarioDto.senha, saltRounds);
+
+    // 3. Criamos o usuário substituindo a senha original pela senha protegida
+    const novoUsuario = this.usuarioRepository.create({
+      ...createUsuarioDto,
+      senha: senhaCriptografada, 
+    });
+    
     return await this.usuarioRepository.save(novoUsuario);
   }
 
@@ -41,7 +50,6 @@ export class UsuariosService {
     return await this.usuarioRepository.find();
   }
 
-  // Adicione dentro de UsuariosService:
   async findByEmail(email: string): Promise<Usuario | null> {
     return await this.usuarioRepository.findOne({ where: { email } });
   }

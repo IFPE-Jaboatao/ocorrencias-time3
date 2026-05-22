@@ -14,7 +14,10 @@ export class Usuario {
 
   @Column({ unique: true })
   email!: string;
-
+  
+  @Column()
+  senha!: string;
+  
   @Column({ type: 'enum', enum: PerfilUsuario })
   perfil!: PerfilUsuario;
 

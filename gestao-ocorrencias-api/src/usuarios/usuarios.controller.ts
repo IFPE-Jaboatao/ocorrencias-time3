@@ -5,7 +5,7 @@ import { extname } from 'path';
 import { UsuariosService } from './usuarios.service';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
 import { RolesGuard } from '../dominio/auth/roles.guard';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiResponse } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags, ApiResponse, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Usuários') // Organiza no Swagger
 @Controller('usuarios')
@@ -20,20 +20,21 @@ export class UsuariosController {
     return this.usuariosService.create(createUsuarioDto);
   }
 
-@Post('perfil/foto')
+  @Post('perfil/foto')
   @ApiOperation({ summary: 'Faz o upload da foto de perfil do usuário logado' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        foto: { // Aqui o nome é "foto"
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
   @ApiBearerAuth()
-  @UseGuards(RolesGuard) // Garante que só usuários logados acedam
-  @UseInterceptors(FileInterceptor('foto', {
-    storage: diskStorage({
-      destination: './uploads', // Reutilizamos a mesma pasta
-      filename: (req, file, cb) => {
-        const nomeUnico = `profile-${Date.now()}`;
-        const extensao = extname(file.originalname);
-        cb(null, `${nomeUnico}${extensao}`);
-      }
-    })
-  }))
   uploadFoto(@UploadedFile(
     new ParseFilePipe({
       validators: [

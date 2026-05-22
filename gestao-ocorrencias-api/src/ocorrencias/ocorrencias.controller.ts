@@ -8,7 +8,7 @@ import { UpdateStatusDto } from './dto/update-status.dto';
 import { RolesGuard } from '../dominio/auth/roles.guard';
 import { Perfis } from '../dominio/auth/perfis.decorator';
 import { PerfilUsuario } from '../dominio/enums';
-import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiOperation, ApiTags, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
 
 @ApiTags('Ocorrencias')
 @ApiBearerAuth()
@@ -51,17 +51,19 @@ export class OcorrenciasController {
 
   @Post(':id/evidencias')
   @ApiOperation({ summary: 'Anexa uma evidência (imagem ou PDF) à ocorrência' })
+  @ApiConsumes('multipart/form-data') // <-- Avisa que vai receber arquivo
+  @ApiBody({ // <-- Desenha o botão de upload na tela do Swagger
+    schema: {
+      type: 'object',
+      properties: {
+        arquivo: {
+          type: 'string',
+          format: 'binary',
+        },
+      },
+    },
+  })
   @Perfis(PerfilUsuario.PROFESSOR, PerfilUsuario.COORDENADOR, PerfilUsuario.ADMIN)
-  @UseInterceptors(FileInterceptor('arquivo', {
-    storage: diskStorage({
-      destination: './uploads',
-      filename: (req, file, cb) => {
-        const nomeUnico = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-        const extensao = extname(file.originalname);
-        cb(null, `${nomeUnico}${extensao}`);
-      }
-    })
-  }))
   uploadEvidencia(
     @Param('id') id: string,
     @UploadedFile(

@@ -1,17 +1,19 @@
-// src/auth/auth.controller.ts
-import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBody } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { LoginDto } from './dto/login.dto';
 
-@ApiTags('Autenticação')
+@ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
-  @HttpCode(HttpStatus.OK)
   @Post('login')
-  @ApiOperation({ summary: 'Login simulado (Requer apenas email)' })
-  signIn(@Body('email') email: string) {
-    return this.authService.loginSimulado(email);
+  @ApiOperation({ summary: 'Faz o login simulado e retorna o Token JWT' })
+  @ApiBody({ type: LoginDto }) 
+  login(@Body() loginDto: LoginDto) {
+    // Aqui chamamos o 'loginSimulado' e passamos apenas o email, 
+    // tal como o seu AuthService está a pedir!
+    return this.authService.loginSimulado(loginDto.email);
   }
 }
