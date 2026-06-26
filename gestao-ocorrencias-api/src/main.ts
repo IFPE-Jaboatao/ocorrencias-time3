@@ -6,6 +6,9 @@ import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
+  // Habilita o CORS para o Frontend conseguir se conectar (ADICIONADO AQUI)
+  app.enableCors();
+
   // Ativa a validação global (Garante que os dados enviados estejam corretos)
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true, // Remove campos que não estão no DTO
