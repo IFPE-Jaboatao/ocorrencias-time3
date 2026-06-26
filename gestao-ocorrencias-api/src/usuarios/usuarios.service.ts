@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Usuario } from './entities/usuario.entity';
 import { CreateUsuarioDto } from './dto/create-usuario.dto';
-import * as bcrypt from 'bcrypt'; // <-- 1. Importação do bcrypt adicionada aqui
+import { PerfilUsuario } from '../dominio/enums';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsuariosService {
@@ -13,7 +14,7 @@ export class UsuariosService {
   ) {}
 
   async create(createUsuarioDto: CreateUsuarioDto): Promise<Usuario> {
-    // Regra de Negócio: Verifica se já existe um usuário com este email ou matrícula
+    // 1. Verifica se já existe um usuário com este email ou matrícula
     const usuarioExistente = await this.usuarioRepository.findOne({
       where: [
         { email: createUsuarioDto.email },
@@ -25,11 +26,30 @@ export class UsuariosService {
       throw new ConflictException('Já existe um usuário com este email ou matrícula cadastrado.');
     }
 
-    // <-- 2. A mágica da criptografia acontece aqui
+    // 2. Regra de Negócio: Validação para o perfil RESPONSAVEL
+    if (createUsuarioDto.perfil === PerfilUsuario.RESPONSAVEL) {
+      if (!createUsuarioDto.matriculaVinculada) {
+        throw new BadRequestException('A matrícula do aluno vinculado é obrigatória para o cadastro de responsáveis.');
+      }
+
+      // Verifica se o aluno com essa matrícula realmente existe no banco e se é de fato um ALUNO
+      const alunoVinculado = await this.usuarioRepository.findOne({
+        where: { 
+          matricula: createUsuarioDto.matriculaVinculada, 
+          perfil: PerfilUsuario.ALUNO 
+        }
+      });
+
+      if (!alunoVinculado) {
+        throw new NotFoundException('O aluno com a matrícula informada não foi encontrado no sistema.');
+      }
+    }
+
+    // 3. Criptografia da senha
     const saltRounds = 10;
     const senhaCriptografada = await bcrypt.hash(createUsuarioDto.senha, saltRounds);
 
-    // 3. Criamos o usuário substituindo a senha original pela senha protegida
+    // 4. Cria e salva o usuário
     const novoUsuario = this.usuarioRepository.create({
       ...createUsuarioDto,
       senha: senhaCriptografada, 

@@ -14,16 +14,16 @@ export class Usuario {
 
   @Column({ unique: true })
   email!: string;
-  
+
   @Column()
   senha!: string;
-  
-  @Column({ type: 'enum', enum: PerfilUsuario })
+
+  @Column({ type: 'enum', enum: PerfilUsuario, default: PerfilUsuario.ALUNO })
   perfil!: PerfilUsuario;
 
   @Column({ nullable: true })
-  fotoPerfil!: string; // Guardará o nome do ficheiro (ex: profile-123.jpg)
+  fotoPerfil!: string;
 
-  @CreateDateColumn()
-  dataCriacao!: Date;
+  @Column({ nullable: true })
+  matriculaVinculada!: string;
 }

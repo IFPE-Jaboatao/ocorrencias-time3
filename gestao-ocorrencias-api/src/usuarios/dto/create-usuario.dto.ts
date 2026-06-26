@@ -1,4 +1,4 @@
-import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsNotEmpty, IsString, MinLength, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { PerfilUsuario } from '../../dominio/enums';
 
@@ -26,4 +26,13 @@ export class CreateUsuarioDto {
   @ApiProperty({ enum: PerfilUsuario, example: PerfilUsuario.ALUNO })
   @IsEnum(PerfilUsuario, { message: 'Perfil inválido' })
   perfil!: PerfilUsuario;
+
+  @ApiProperty({ 
+    example: '20231001', 
+    required: false, 
+    description: 'Obrigatório apenas para o perfil RESPONSAVEL. Informar a matrícula escolar do aluno.' 
+  })
+  @IsString()
+  @IsOptional()
+  matriculaVinculada?: string;
 }
