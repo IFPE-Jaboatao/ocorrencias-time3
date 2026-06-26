@@ -1,12 +1,20 @@
 import { useEffect, useState, useCallback } from 'react';
-// IMPORTAÇÕES REDUZIDAS AO MÁXIMO: Apenas componentes que sabemos que funcionam (Cards e Botões)
 import { Button, Card, Spinner, Alert, Badge } from 'flowbite-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
+// Novas Interfaces
+interface UsuarioAluno {
+  id: string;
+  nome: string;
+  matricula: string;
+  perfil: string;
+}
+
 interface Ocorrencia {
   id: string;
-  titulo: string;
+  categoria?: string;
+  titulo?: string;
   descricao: string;
   status: string;
   severidade: string;
@@ -27,20 +35,22 @@ interface Estatisticas {
 export default function Dashboard() {
   const [estatisticas, setEstatisticas] = useState<Estatisticas | null>(null);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
+  const [alunosCadastrados, setAlunosCadastrados] = useState<UsuarioAluno[]>([]); // Novo estado para os alunos
+  
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState('');
 
   const [usuarioNome, setUsuarioNome] = useState('');
   const [usuarioPerfil, setUsuarioPerfil] = useState('');
-  const [usuarioMatricula, setUsuarioMatricula] = useState('');
+  const [autorId, setAutorId] = useState('');
 
+  // Estados do Modal
   const [modalAberto, setModalAberto] = useState(false);
-  const [novoTitulo, setNovoTitulo] = useState('');
-  const [novaDescricao, setNovaDescricao] = useState('');
-  const [novaSeveridade, setNovaSeveridade] = useState('BAIXA');
-  const [alunosEnvolvidos, setAlunosEnvolvidos] = useState('');
-  const [comentarioInicial, setComentarioInicial] = useState('');
-  const [arquivoEvidencia, setArquivoEvidencia] = useState<File | null>(null);
+  const [categoria, setCategoria] = useState('');
+  const [descricao, setDescricao] = useState('');
+  const [severidade, setSeveridade] = useState('BAIXA');
+  const [alunoId, setAlunoId] = useState(''); 
+  const [contextoAcademico, setContextoAcademico] = useState('');
   const [salvando, setSalvando] = useState(false);
 
   const navigate = useNavigate();
@@ -50,6 +60,7 @@ export default function Dashboard() {
       setCarregando(true);
       setErro('');
 
+      // 1. Busca Estatísticas
       try {
         const dashboardRes = await api.get('/ocorrencias/dashboard');
         setEstatisticas(dashboardRes.data);
@@ -57,6 +68,7 @@ export default function Dashboard() {
         console.warn('Dashboard restrito ou erro:', err.message);
       }
 
+      // 2. Busca Ocorrências
       try {
         const ocorrenciasRes = await api.get('/ocorrencias');
         setOcorrencias(ocorrenciasRes.data || []);
@@ -67,6 +79,19 @@ export default function Dashboard() {
           throw err;
         }
       }
+
+      // 3. Busca Usuários (Para preencher o Select do Modal)
+      try {
+        const usuariosRes = await api.get('/usuarios');
+        if (Array.isArray(usuariosRes.data)) {
+          // Filtra para garantir que só apareçam usuários com o perfil ALUNO na lista
+          const apenasAlunos = usuariosRes.data.filter((u: UsuarioAluno) => u.perfil === 'ALUNO');
+          setAlunosCadastrados(apenasAlunos);
+        }
+      } catch (err: any) {
+        console.warn('Erro ao buscar lista de alunos:', err.message);
+      }
+
     } catch (err: any) {
       setErro('Não foi possível ligar ao servidor.');
       if (err.response?.status === 401) {
@@ -92,7 +117,7 @@ export default function Dashboard() {
 
       setUsuarioNome(payloadDecodificado.nome || 'Usuário');
       setUsuarioPerfil(payloadDecodificado.perfil || 'ALUNO');
-      setUsuarioMatricula(payloadDecodificado.matricula || 'Não informada');
+      setAutorId(payloadDecodificado.sub || payloadDecodificado.id || '');
     } catch (err) {
       localStorage.removeItem('token');
       navigate('/');
@@ -112,45 +137,26 @@ export default function Dashboard() {
     setSalvando(true);
 
     try {
-      const response = await api.post('/ocorrencias', {
-        titulo: novoTitulo,
-        descricao: novaDescricao,
-        severidade: novaSeveridade,
-        alunosEnvolvidos: alunosEnvolvidos,
+      await api.post('/ocorrencias', {
+        alunoId: alunoId,
+        autorId: autorId, 
+        categoria: categoria,
+        severidade: severidade,
+        descricao: descricao,
+        contextoAcademico: contextoAcademico ? contextoAcademico : undefined,
       });
 
-      const ocorrenciaId = response.data.id;
-
-      if (comentarioInicial.trim() !== '' && ocorrenciaId) {
-        await api.post(`/ocorrencias/${ocorrenciaId}/comentarios`, {
-          texto: comentarioInicial,
-        });
-      }
-
-      if (arquivoEvidencia && ocorrenciaId) {
-        const formData = new FormData();
-        formData.append('file', arquivoEvidencia);
-        
-        await api.post(`/ocorrencias/${ocorrenciaId}/evidencias`, formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-      }
-
-      setNovoTitulo('');
-      setNovaDescricao('');
-      setNovaSeveridade('BAIXA');
-      setAlunosEnvolvidos('');
-      setComentarioInicial('');
-      setArquivoEvidencia(null);
+      setCategoria('');
+      setDescricao('');
+      setSeveridade('BAIXA');
+      setAlunoId('');
+      setContextoAcademico('');
       setModalAberto(false);
 
       await carregarDados();
-
     } catch (err: any) {
-      alert(err.response?.data?.message || 'Erro ao processar a criação da ocorrência.');
-      console.error(err);
+      alert(err.response?.data?.message || 'Erro de validação no servidor.');
+      console.error(err.response?.data);
     } finally {
       setSalvando(false);
     }
@@ -262,7 +268,7 @@ export default function Dashboard() {
           )}
         </div>
 
-        {/* TABELA À PROVA DE FALHAS (HTML Nativo) */}
+        {/* TABELA DE DADOS */}
         <div className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-200">
           <div className="p-4 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
             <h3 className="text-lg font-bold text-gray-700">Registos Gerais</h3>
@@ -271,10 +277,10 @@ export default function Dashboard() {
             <table className="w-full text-left text-sm text-gray-500">
               <thead className="bg-gray-50 text-xs uppercase text-gray-700 border-b">
                 <tr>
-                  <th className="px-6 py-3">Título</th>
+                  <th className="px-6 py-3">Categoria/Título</th>
                   <th className="px-6 py-3">Criado por</th>
                   <th className="px-6 py-3">Data</th>
-                  <th className="px-6 py-3">Grau / Severidade</th>
+                  <th className="px-6 py-3">Grau</th>
                   <th className="px-6 py-3">Status</th>
                   <th className="px-6 py-3">Ações</th>
                 </tr>
@@ -290,7 +296,7 @@ export default function Dashboard() {
                   ocorrencias.map((ocorrencia) => (
                     <tr key={ocorrencia.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 font-semibold text-gray-900 whitespace-nowrap">
-                        {ocorrencia.titulo}
+                        {ocorrencia.categoria || ocorrencia.titulo || 'Sem categoria'}
                       </td>
                       <td className="px-6 py-4">{ocorrencia.usuario?.nome || 'Sistema'}</td>
                       <td className="px-6 py-4">
@@ -313,14 +319,6 @@ export default function Dashboard() {
                         >
                           Visualizar
                         </button>
-                        {ehCoordenador && (
-                          <button
-                            onClick={() => alert(`Editar status da ocorrência: ${ocorrencia.id}`)}
-                            className="font-medium text-red-600 hover:underline text-sm ml-4"
-                          >
-                            Gerenciar
-                          </button>
-                        )}
                       </td>
                     </tr>
                   ))
@@ -331,43 +329,36 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* MODAL 100% NATIVO HTML E TAILWIND (Impossível dar erro do Flowbite) */}
+      {/* MODAL COM SELECT DINÂMICO DE ALUNOS */}
       {modalAberto && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 backdrop-blur-sm">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
             
-            {/* Header do Modal */}
             <div className="flex justify-between items-start p-5 border-b rounded-t">
               <div>
                 <h3 className="text-xl font-bold text-gray-900">Abertura de Ocorrência Acadêmica</h3>
-                <p className="text-sm text-gray-500 mt-1">
-                  Autor do registro: <strong>{usuarioNome}</strong> (Matrícula: {usuarioMatricula})
-                </p>
               </div>
               <button onClick={() => setModalAberto(false)} className="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm w-8 h-8 ms-auto inline-flex justify-center items-center">
-                <svg className="w-3 h-3" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 14 14">
-                  <path stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="m1 1 6 6m0 0 6 6M7 7l6-6M7 7l-6 6"/>
-                </svg>
+                X
               </button>
             </div>
 
-            {/* Corpo do Modal */}
             <div className="p-5 overflow-y-auto">
               <form onSubmit={handleCriarOcorrencia} className="flex flex-col gap-4">
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="titulo" className="block mb-2 text-sm font-medium text-gray-900">Título Breve</label>
-                    <input type="text" id="titulo" placeholder="Ex: Atraso recorrente, Indisciplina..." required
+                    <label htmlFor="categoria" className="block mb-2 text-sm font-medium text-gray-900">Categoria</label>
+                    <input type="text" id="categoria" placeholder="Ex: Indisciplina, Atraso..." required
                       className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      value={novoTitulo} onChange={(e) => setNovoTitulo(e.target.value)} />
+                      value={categoria} onChange={(e) => setCategoria(e.target.value)} />
                   </div>
                   
                   <div>
                     <label htmlFor="severidade" className="block mb-2 text-sm font-medium text-gray-900">Grau de Severidade</label>
                     <select id="severidade" required
                       className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      value={novaSeveridade} onChange={(e) => setNovaSeveridade(e.target.value)}>
+                      value={severidade} onChange={(e) => setSeveridade(e.target.value)}>
                       <option value="BAIXA">Baixa</option>
                       <option value="MEDIA">Média</option>
                       <option value="ALTA">Alta</option>
@@ -376,32 +367,39 @@ export default function Dashboard() {
                 </div>
 
                 <div>
-                  <label htmlFor="alunosEnvolvidos" className="block text-sm font-medium text-gray-900">Matrículas dos Alunos Envolvidos</label>
-                  <span className="text-xs text-gray-400 block mb-2">Separe as matrículas por vírgula (ex: 202601, 202602)</span>
-                  <input type="text" id="alunosEnvolvidos" placeholder="Matrículas envolvidas"
+                  <label htmlFor="contextoAcademico" className="block mb-2 text-sm font-medium text-gray-900">Contexto Acadêmico (Opcional)</label>
+                  <input type="text" id="contextoAcademico" placeholder="Ex: Avaliação de Matemática, Aula de Física..."
                     className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                    value={alunosEnvolvidos} onChange={(e) => setAlunosEnvolvidos(e.target.value)} />
+                    value={contextoAcademico} onChange={(e) => setContextoAcademico(e.target.value)} />
+                </div>
+
+                {/* NOVO CAMPO: Select puxando do Backend */}
+                <div>
+                  <label htmlFor="alunoId" className="block mb-2 text-sm font-medium text-gray-900">Aluno Envolvido</label>
+                  <select 
+                    id="alunoId" 
+                    required
+                    className="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
+                    value={alunoId} 
+                    onChange={(e) => setAlunoId(e.target.value)}
+                  >
+                    <option value="" disabled>Selecione um aluno da lista...</option>
+                    {alunosCadastrados.map(aluno => (
+                      <option key={aluno.id} value={aluno.id}>
+                        {aluno.nome} (Matrícula: {aluno.matricula || 'Sem matrícula'})
+                      </option>
+                    ))}
+                  </select>
+                  {alunosCadastrados.length === 0 && (
+                    <p className="mt-1 text-xs text-red-500">Nenhum aluno foi encontrado no banco de dados.</p>
+                  )}
                 </div>
 
                 <div>
                   <label htmlFor="descricao" className="block mb-2 text-sm font-medium text-gray-900">Descrição Detalhada do Fato</label>
                   <textarea id="descricao" placeholder="Relate o que aconteceu de forma objetiva..." required rows={3}
                     className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                    value={novaDescricao} onChange={(e) => setNovaDescricao(e.target.value)} />
-                </div>
-
-                <div>
-                  <label htmlFor="comentario" className="block mb-2 text-sm font-medium text-gray-900">Comentário Adicional (Opcional)</label>
-                  <textarea id="comentario" placeholder="Observações complementares, notas para a coordenação..." rows={2}
-                    className="block p-2.5 w-full text-sm text-gray-900 bg-gray-50 rounded-lg border border-gray-300 focus:ring-blue-500 focus:border-blue-500"
-                    value={comentarioInicial} onChange={(e) => setComentarioInicial(e.target.value)} />
-                </div>
-
-                <div id="fileUpload" className="w-full">
-                  <label htmlFor="file" className="block mb-2 text-sm font-medium text-gray-900">Anexar Evidências (Fotos, PDFs)</label>
-                  <input type="file" id="file" onChange={(e) => setArquivoEvidencia(e.target.files ? e.target.files[0] : null)}
-                    className="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none file:mr-4 file:py-2 file:px-4 file:rounded-l-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
-                  <p className="mt-1 text-xs text-gray-500">Formatos suportados: JPG, PNG ou PDF (Máx. 5MB).</p>
+                    value={descricao} onChange={(e) => setDescricao(e.target.value)} />
                 </div>
 
                 <div className="w-full mt-4 border-t pt-4 flex justify-end gap-3">
@@ -409,7 +407,7 @@ export default function Dashboard() {
                     Cancelar
                   </Button>
                   <Button type="submit" color="blue" isProcessing={salvando}>
-                    Registrar e Salvar Anexos
+                    Registrar Ocorrência
                   </Button>
                 </div>
               </form>
